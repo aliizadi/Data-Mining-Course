@@ -1,69 +1,45 @@
 import pandas as pd
 import numpy as np
-from sklearn.cross_validation import  train_test_split
-from sklearn.cross_validation import cross_val_score
+from sklearn.cross_validation import train_test_split
 from sklearn import tree
-from sklearn.metrics import accuracy_score
 import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.grid_search import  GridSearchCV
 
+# Reading Data
 train_df = pd.read_csv('data/train.csv')
 test_df = pd.read_csv('data/test.csv')
 
+train_df.head()
+train_df.info()
+
+# add column names to data frames to process them easier
 train_df.columns = ['family', 'product', 'steel', 'carbon', 'hardness', 'temper_rolling', 'condition', 'formability',
                    'strength', 'non-ageing', 'surface-finish', 'surface-quality', 'enamelability', 'bc', 'bf', 'bt',
                    'bw/me', 'bl', 'm', 'chrom', 'phos', 'cbond', 'marvi', 'exptl', 'ferro', 'corr', 'blue/bright/varn/clean',
                    'lustre', 'jurofm', 's', 'p', 'shape', 'thick', 'width', 'len', 'oil', 'bore', 'packing', 'classes']
 
+test_df.columns = ['family', 'product', 'steel', 'carbon', 'hardness', 'temper_rolling', 'condition', 'formability',
+                   'strength', 'non-ageing', 'surface-finish', 'surface-quality', 'enamelability', 'bc', 'bf', 'bt',
+                   'bw/me', 'bl', 'm', 'chrom', 'phos', 'cbond', 'marvi', 'exptl', 'ferro', 'corr', 'blue/bright/varn/clean',
+                   'lustre', 'jurofm', 's', 'p', 'shape', 'thick', 'width', 'len', 'oil', 'bore', 'packing']
 
+# handle missing data
 train_df.replace(to_replace='?', value=np.nan, inplace=True)
 train_df.dropna(thresh=730, axis=1, inplace=True)
 train_df.dropna(thresh=2, axis=0, inplace=True)
+
+# target values
 y = train_df.iloc[:, -1].values
 
-X = pd.get_dummies(train_df.iloc[:, :-2])
-
-# print(X.columns)
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=0)
-
-clf = tree.DecisionTreeClassifier()
-# clf.fit(X_train, y_train)
-
-# y_pred = clf.predict(X_test)
-# print(len(y_pred), len(y_test))
-
-# print(np.count_nonzero(y == '3'))
+# train and test
+X = train_df.iloc[:, :-2]
+X_final_test = test_df.loc[:, X.columns]
 
 
-# print(accuracy_score(y_test, y_pred))
-
-# scores = cross_val_score(estimator=clf,
-#     X=X,
-#     y=y,
-#     cv=10,
-#     n_jobs=1)
-# print('CV accuracy scores: %s' % scores)
-# print('CV accuracy: %.3f +/- %.3f' % (np.mean(scores),
-# np.std(scores)))
-
-param_grid = [{'criterion': ['gini'],
-               'max_depth': [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
-               'min_samples_split': [2, 3, 4, 5]},
-              {'criterion': ['entropy'],
-               'max_depth': [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
-               'min_samples_split': [2, 3, 4, 5]}
-              ]
-
-gs = GridSearchCV(estimator=clf,
-                  param_grid=param_grid,
-                  scoring='accuracy',
-                  cv=10,
-                  n_jobs=-1)
-
-gs.fit(X_train, y_train)
-print(gs.best_score_)
-print(gs.best_params_)
+# one-hot encoding
+X = pd.get_dummies(X)
+X_final_test = pd.get_dummies(X_final_test)
 
 def plot_correlation_map( df ):
     corr = train_df.corr()
@@ -80,20 +56,60 @@ def plot_correlation_map( df ):
     )
     plt.show()
 
-
 # plot_correlation_map(train_df)
 
 
+# split X to train and test
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=0)
 
-# continuous_df = train_df.loc[:, ['carbon', 'hardness', 'strength', 'thick', 'width', 'len']]
-# train_df.drop(columns=['carbon', 'hardness', 'strength', 'thick', 'width', 'len'], inplace=True)
+clf = tree.DecisionTreeClassifier()
 
-# print(train_df.head())
+#clf.fit(X_train, y_train)
+# y_pred = clf.predict(X_test)
+# print(np.count_nonzero(y == '3'))
+# print(accuracy_score(y_test, y_pred))
 
 
-# imr = Imputer(missing_values='NaN', strategy='most_frequent', axis=1)
-# imputer_data = imr.fit(train_df)
-# imputed = imr.transform(train_df.values)
+# scores = cross_val_score(estimator=clf,
+#     X=X,
+#     y=y,
+#     cv=10,
+#     n_jobs=1)
+# print('CV accuracy scores: %s' % scores)
+# print('CV accuracy: %.3f +/- %.3f' % (np.mean(scores),
+# np.std(scores)))
+
+# hyper parameters tuning
+param_grid = [{'criterion': ['gini'],
+               'max_depth': [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
+               'min_samples_split': [2, 3, 4, 5]},
+              {'criterion': ['entropy'],
+               'max_depth': [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
+               'min_samples_split': [2, 3, 4, 5]}
+              ]
+
+gs = GridSearchCV(estimator=clf,
+                  param_grid=param_grid,
+                  scoring='accuracy',
+                  cv=10,
+                  n_jobs=-1)
+gs = gs.fit(X_train, y_train)
+
+
+clf = gs.best_estimator_
+clf.fit(X, y)
+
+y_pred = clf.predict(X_final_test)
+
+# there are many classes with label 3. This is a weird data sets. I think classifier is not general for all data sets
+# and maybe distribution of data is not good. we need more data!!!
+print(np.count_nonzero(y == '3'))
+print(np.count_nonzero(y_pred == '3'))
+
+
+output = pd.DataFrame(y_pred)
+output.to_csv('result.csv', index=False)
+
 
 
 
