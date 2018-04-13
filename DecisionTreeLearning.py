@@ -4,14 +4,15 @@ from sklearn.cross_validation import train_test_split
 from sklearn import tree
 import seaborn as sns
 import matplotlib.pyplot as plt
-from sklearn.grid_search import  GridSearchCV
+from sklearn.grid_search import GridSearchCV
+from sklearn.base import TransformerMixin
 
 # Reading Data
 train_df = pd.read_csv('data/train.csv')
 test_df = pd.read_csv('data/test.csv')
 
 train_df.head()
-train_df.info()
+# train_df.info()
 
 # add column names to data frames to process them easier
 train_df.columns = ['family', 'product', 'steel', 'carbon', 'hardness', 'temper_rolling', 'condition', 'formability',
@@ -26,20 +27,52 @@ test_df.columns = ['family', 'product', 'steel', 'carbon', 'hardness', 'temper_r
 
 # handle missing data
 train_df.replace(to_replace='?', value=np.nan, inplace=True)
-train_df.dropna(thresh=730, axis=1, inplace=True)
+train_df.dropna(thresh=500, axis=1, inplace=True)
 train_df.dropna(thresh=2, axis=0, inplace=True)
+train_df = train_df[train_df.classes != 'U']
+
+test_df.replace(to_replace='?', value=np.nan, inplace=True)
+
+# print(train_df.info())
+
+
+class DataFrameImputer(TransformerMixin):
+
+    def __init__(self):
+        """Impute missing values.
+        """
+    def fit(self, X, y=None):
+
+        self.fill = pd.Series([X[c].value_counts().index[0]
+            if X[c].dtype == np.dtype('O') else X[c].mean() for c in X],
+            index=X.columns)
+
+        return self
+
+    def transform(self, X, y=None):
+        return X.fillna(self.fill)
+
+
+train_df = DataFrameImputer().fit_transform(train_df)
+test_df = DataFrameImputer().fit_transform(test_df)
+
 
 # target values
 y = train_df.iloc[:, -1].values
 
 # train and test
-X = train_df.iloc[:, :-2]
+X = train_df.iloc[:, :-1]
 X_final_test = test_df.loc[:, X.columns]
-
+# print(X.columns)
+# print(X_final_test.columns)
+# print(train_df.columns)
 
 # one-hot encoding
 X = pd.get_dummies(X)
 X_final_test = pd.get_dummies(X_final_test)
+# print(X.columns)
+# print(X_final_test.columns)
+
 
 def plot_correlation_map( df ):
     corr = train_df.corr()
@@ -55,6 +88,7 @@ def plot_correlation_map( df ):
         annot_kws = { 'fontsize' : 12 }
     )
     plt.show()
+
 
 # plot_correlation_map(train_df)
 
@@ -94,6 +128,7 @@ gs = GridSearchCV(estimator=clf,
                   cv=10,
                   n_jobs=-1)
 gs = gs.fit(X_train, y_train)
+print(gs.best_score_)
 
 
 clf = gs.best_estimator_
